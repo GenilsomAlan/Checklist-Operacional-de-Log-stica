@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Checklist Operacional de Logística</title>
+  <style>
+    :root{
+      --bg:#0b1320; --card:#121a2a; --ink:#e8eefc; --muted:#a9b6d3; --accent:#5aa9ff; --ok:#38b000; --warn:#ffb703;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Inter,Arial,sans-serif;background:linear-gradient(160deg,var(--bg),#121826 60%);color:var(--ink);}
+    .wrap{max-width:1000px;margin:40px auto;padding:20px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,.08);border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+    header{padding:24px 24px 0}
+    h1{margin:0 0 6px;font-size:clamp(20px,3vw,28px);letter-spacing:.2px}
+    p.sub{margin:0;color:var(--muted)}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;padding:16px 24px;border-top:1px solid rgba(255,255,255,.08);border-bottom:1px solid rgba(255,255,255,.08)}
+    button{appearance:none;border:1px solid rgba(255,255,255,.12);background:#0e1626;color:var(--ink);padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:600}
+    button:hover{border-color:var(--accent)}
+    button.primary{background:linear-gradient(180deg,#1b2842,#142033);border-color:#284066}
+    button.success{background:linear-gradient(180deg,#1c3b25,#14281a);border-color:#2d6a4f}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px;padding:20px}
+    @media(min-width:700px){.grid{grid-template-columns:1fr 1fr}}
+    .item{display:flex;gap:12px;align-items:flex-start;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);padding:14px;border-radius:16px}
+    .label{font-weight:700}
+    .meta{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12px}
+    .right{margin-left:auto}
+    textarea{width:100%;min-height:68px;background:#0e1626;border:1px solid rgba(255,255,255,.12);color:var(--ink);border-radius:12px;padding:10px;resize:vertical}
+    .footer{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;color:var(--muted)}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    input[type="text"], input[type="date"]{background:#0e1626;border:1px solid rgba(255,255,255,.12);color:var(--ink);border-radius:10px;padding:10px}
+    .pill{font-size:12px;border:1px solid rgba(255,255,255,.14);padding:6px 10px;border-radius:999px;color:var(--muted)}
+    .count{font-weight:700;color:var(--ink)}
+    @media print{
+      body{background:white;color:black}
+      .wrap{margin:0}
+      .controls{display:none}
+      .card{border:1px solid #ddd;box-shadow:none}
+      textarea, input{border:1px solid #bbb}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <h1>Checklist Operacional de Logística</h1>
+        <p class="sub">Marque as etapas concluídas e registre observações quando necessário.</p>
+        <div class="row" style="margin-top:12px">
+          <label>
+            <span class="pill">Data</span><br/>
+            <input id="dataRef" type="date" />
+          </label>
+          <label>
+            <span class="pill">Responsável</span><br/>
+            <input id="responsavel" type="text" placeholder="Nome" />
+          </label>
+          <div class="pill right"><span class="count" id="doneCount">0</span>/<span id="totalCount">0</span> concluídos</div>
+        </div>
+      </header>
+
+      <div class="controls">
+        <button id="checkAll">Marcar tudo</button>
+        <button id="uncheckAll">Desmarcar tudo</button>
+        <button id="save" class="success">Salvar (este navegador)</button>
+        <button id="clear">Limpar dados salvos</button>
+        <button id="print" class="primary">Imprimir / PDF</button>
+        <button id="report">Gerar Relatório</button>
+      </div>
+
+      <div class="grid" id="list"></div>
+
+      <div class="footer">
+        <small>Correções aplicadas: "Processamento" (antes "precessamento"), "Planos de embarque" (singular), "TMS" (sigla).</small>
+        <small>Versão: 1.4</small>
+      </div>
+    </div>
+  </div>
+
+  <template id="tpl">
+    <div class="item">
+      <input type="checkbox" />
+      <div style="width:100%">
+        <div class="row" style="align-items:center;justify-content:space-between">
+          <div class="label"></div>
+          <div class="meta">
+            <label class="pill"><input type="checkbox" class="ok"/> OK</label>
+            <label class="pill"><input type="checkbox" class="pend"/> Pendente</label>
+            <label class="pill"><input type="checkbox" class="na"/> N/A</label>
+          </div>
+        </div>
+        <textarea placeholder="Observações / Não conformidades / Ações"></textarea>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    const itens = [
+      'Análises de faltas',
+      'TMS',
+      'Bonificado',
+      'Parcerias',
+      'Processamento dos pedidos',
+      'Planos de embarque',
+      'Listas de separação'
+    ];
+
+    const list = document.getElementById('list');
+    const tpl = document.getElementById('tpl');
+    const doneCount = document.getElementById('doneCount');
+    const totalCount = document.getElementById('totalCount');
+
+    function render(){
+      list.innerHTML = '';
+      itens.forEach((t, i)=>{
+        const node = tpl.content.cloneNode(true);
+        node.querySelector('.label').textContent = t;
+        node.querySelector('input[type="checkbox"]').dataset.key = `check_${i}`;
+        node.querySelector('textarea').dataset.key = `note_${i}`;
+        node.querySelector('.ok').dataset.key = `ok_${i}`;
+        node.querySelector('.pend').dataset.key = `pend_${i}`;
+        node.querySelector('.na').dataset.key = `na_${i}`;
+        list.appendChild(node);
+      });
+      totalCount.textContent = itens.length;
+    }
+
+    function bind(){
+      list.addEventListener('change', (e)=>{
+        if(!e.target.dataset.key) return;
+        if(e.target.classList.contains('ok') || e.target.classList.contains('pend') || e.target.classList.contains('na')){
+          const base = e.target.dataset.key.split('_')[0];
+          const idx = e.target.dataset.key.split('_')[1];
+          ['ok','pend','na'].forEach(k=>{
+            if(k!==e.target.className){
+              const other = list.querySelector(`[data-key="${k}_${idx}"]`);
+              if(other) other.checked = false;
+            }
+          });
+        }
+        saveToLocal();
+        updateDone();
+      });
+
+      list.addEventListener('input', (e)=>{ if(e.target.dataset.key) saveToLocal(); });
+
+      document.getElementById('checkAll').onclick = ()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(c=>{ if(!['ok','pend','na'].some(k=>c.classList.contains(k))) c.checked = true; }); saveToLocal(); updateDone(); };
+      document.getElementById('uncheckAll').onclick = ()=>{ list.querySelectorAll('input[type="checkbox"]').forEach(c=>{ if(!['ok','pend','na'].some(k=>c.classList.contains(k))) c.checked = false; }); saveToLocal(); updateDone(); };
+      document.getElementById('save').onclick = saveToLocal;
+      document.getElementById('clear').onclick = ()=>{ localStorage.removeItem('checklistLog'); loadFromLocal(); };
+      document.getElementById('print').onclick = ()=>window.print();
+      document.getElementById('report').onclick = gerarRelatorio;
+      document.getElementById('dataRef').addEventListener('change', saveToLocal);
+      document.getElementById('responsavel').addEventListener('input', saveToLocal);
+    }
+
+    function updateDone(){
+      const checks = [...list.querySelectorAll('> .item > input[type="checkbox"]')];
+      doneCount.textContent = checks.filter(c=>c.checked).length;
+    }
+
+    function saveToLocal(){
+      const data = { dataRef: document.getElementById('dataRef').value, responsavel: document.getElementById('responsavel').value, campos: {} };
+      list.querySelectorAll('[data-key]').forEach(el=>{ data.campos[el.dataset.key] = el.type==='checkbox'?!!el.checked:el.value||''; });
+      localStorage.setItem('checklistLog', JSON.stringify(data));
+    }
+
+    function loadFromLocal(){
+      render();
+      const raw = localStorage.getItem('checklistLog');
+      const data = raw ? JSON.parse(raw) : null;
+      if(data){ document.getElementById('dataRef').value = data.dataRef || ''; document.getElementById('responsavel').value = data.responsavel || ''; list.querySelectorAll('[data-key]').forEach(el=>{ el.type==='checkbox'?el.checked=!!data.campos[el.dataset.key]:el.value=data.campos[el.dataset.key]||'' }); }
+      else{ const today=new Date();document.getElementById('dataRef').value=today.toISOString().slice(0,10); }
+      bind(); updateDone();
+    }
+
+    function gerarRelatorio(){
+      const dataVal=document.getElementById('dataRef').value;
+      const [y,m,d]=dataVal.split('-');
+      const dataFmt=`${d}/${m}/${y}`;
+      let texto=`Passagem de turno ${dataFmt}`;
+      itens.forEach((t,i)=>{
+        const okEl=document.querySelector(`[data-key="ok_${i}"]`);
+        const pendEl=document.querySelector(`[data-key="pend_${i}"]`);
+        const naEl=document.querySelector(`[data-key="na_${i}"]`);
+        const noteEl=document.querySelector(`[data-key="note_${i}"]`);
+        let status='pendente', emoji='⚠️';
+        if(okEl&&okEl.checked){status='ok';emoji='✅';} else if(pendEl&&pendEl.checked){status='pendente';emoji='⚠️';} else if(naEl&&naEl.checked){status='N/A';emoji='❌';}
+        const obs=noteEl?noteEl.value.replace(/\n/g,' '):'';
+        texto+=`\n${emoji} ${t}: ${status}${obs? ' - '+obs : ''}`;
+      });
+      navigator.clipboard.writeText(texto).then(()=>{alert('Relatório copiado para a área de transferência.');});
+    }
+
+    loadFromLocal();
+  </script>
+</body>
+</html>
